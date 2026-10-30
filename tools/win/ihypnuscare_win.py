@@ -11,6 +11,7 @@ import os
 import sys
 import threading
 import time
+import traceback
 
 import webview
 
@@ -49,9 +50,9 @@ class Api:
     """Methods callable from the pages as window.pywebview.api.<name>()."""
 
     def __init__(self):
-        self.window = None
-        self.busy = False
-        self.cancelled = False
+        self._window = None
+        self._busy = False
+        self._cancelled = False
 
     def info(self):
         logo = os.path.join(BASE, "assets", "hypnus-logo.png")
@@ -62,10 +63,10 @@ class Api:
                 "last": last if last and os.path.isdir(last) else None}
 
     def choose_folder(self):
-        if self.busy:
+        if self._busy:
             return
         start = load_settings().get("last_folder") or ""
-        picked = self.window.create_file_dialog(FOLDER_DIALOG, directory=os.path.dirname(start) if start else "")
+        picked = self._window.create_file_dialog(FOLDER_DIALOG, directory=os.path.dirname(start) if start else "")
         if picked:
             self.read_card(picked[0] if isinstance(picked, (list, tuple)) else picked)
 
@@ -75,26 +76,26 @@ class Api:
             self.read_card(last)
 
     def cancel(self):
-        self.cancelled = True
+        self._cancelled = True
 
     def read_card(self, folder):
-        if self.busy:
+        if self._busy:
             return
-        self.busy = True
-        self.cancelled = False
+        self._busy = True
+        self._cancelled = False
         threading.Thread(target=self._read, args=(folder,), daemon=True).start()
 
     def _read(self, folder):
-        js = self.window.evaluate_js
+        js = self._window.evaluate_js
         try:
-            if os.path.basename(self.window.get_current_url() or "").lower() != "ui.html":
-                self.window.load_url(UI)
+            if os.path.basename(self._window.get_current_url() or "").lower() != "ui.html":
+                self._window.load_url(UI)
                 time.sleep(0.8)
             js(f"showLoading({json.dumps(folder.replace(os.path.expanduser('~'), '~', 1))})")
             last = [0.0]
 
             def progress(done, total, name, files):
-                if self.cancelled:
+                if self._cancelled:
                     raise KeyboardInterrupt
                 now = time.time()
                 if done == total or now - last[0] > 0.08:     # don't flood the bridge
@@ -108,21 +109,22 @@ class Api:
             s = load_settings()
             s["last_folder"] = folder
             save_settings(s)
-            self.window.set_title(f"iHypnusCare - {os.path.basename(os.path.normpath(folder))}")
-            self.window.load_url(out)
+            self._window.set_title(f"iHypnusCare - {os.path.basename(os.path.normpath(folder))}")
+            self._window.load_url(out)
         except KeyboardInterrupt:
             js("showWelcome()")
         except SystemExit as e:          # find_root / write_html report problems this way
             js(f"showError({json.dumps(str(e))})")
         except Exception as e:           # noqa: BLE001 - show anything unexpected instead of hanging
+            traceback.print_exc()
             js(f"showError({json.dumps(f'{type(e).__name__}: {e}')})")
         finally:
-            self.busy = False
+            self._busy = False
 
     def save_pdf(self, name, data):
         """Called by the report's Export PDF button with the PDF as base64."""
         docs = os.path.join(os.path.expanduser("~"), "Documents")
-        path = self.window.create_file_dialog(SAVE_DIALOG, directory=docs if os.path.isdir(docs) else "",
+        path = self._window.create_file_dialog(SAVE_DIALOG, directory=docs if os.path.isdir(docs) else "",
                                               save_filename=name, file_types=("PDF files (*.pdf)",))
         if not path:
             return ""
@@ -137,16 +139,25 @@ class Api:
 
 
 def main():
+    os.makedirs(DATA_DIR, exist_ok=True)
+    if getattr(sys, "frozen", False):
+        # a --windowed exe has no console: keep errors (ours and pywebview's) in a log file
+        sys.stdout = sys.stderr = open(os.path.join(DATA_DIR, "log.txt"), "w", encoding="utf-8", buffering=1)
+    print(f"iHypnusCare {VERSION} {time.strftime('%Y-%m-%d %H:%M:%S')} pywebview {getattr(webview, '__version__', '?')} args {sys.argv[1:]}")
     api = Api()
     window = webview.create_window("iHypnusCare", UI, js_api=api, width=1180, height=820,
                                    min_size=(860, 620), background_color="#F9F9F7")
-    api.window = window
+    api._window = window
     card = sys.argv[1] if len(sys.argv) > 1 and os.path.isdir(sys.argv[1]) else None
 
     def started():
-        if card:
-            time.sleep(0.5)
-            api.read_card(card)
+        try:
+            if card:
+                window.events.loaded.wait(15)
+                time.sleep(0.5)
+                api.read_card(card)
+        except Exception:  # noqa: BLE001
+            traceback.print_exc()
 
     webview.start(started, private_mode=False, storage_path=os.path.join(DATA_DIR, "webview"))
 

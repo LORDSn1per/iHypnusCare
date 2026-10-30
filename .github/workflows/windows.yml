@@ -1,0 +1,66 @@
+# Builds iHypnusCare.exe (Windows x64, single file, Python bundled) with PyInstaller.
+# Run it from the Actions tab or `gh workflow run windows.yml -f tag=v1.10`; with "attach" on,
+# the zip is uploaded to that release.
+name: Windows build
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag (version label for the file name)
+        required: true
+        default: v1.10
+      attach:
+        description: Upload the zip to the release
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build tools
+        run: pip install pywebview==5.3.2 pyinstaller==6.11.1 pillow==11.0.0
+
+      - name: Check the reader imports
+        run: python -I -c "import sys; sys.path.insert(0, 'tools'); import hypnus_report; print('reader ok')"
+
+      - name: Make icon
+        run: python -c "from PIL import Image; Image.open('tools/assets/app-icon.png').save('tools/win/app.ico', sizes=[(16,16),(24,24),(32,32),(48,48),(64,64),(128,128),(256,256)])"
+
+      - name: Build exe
+        run: >
+          pyinstaller --noconfirm --clean --onefile --windowed --name iHypnusCare
+          --icon tools/win/app.ico
+          --paths tools
+          --add-data "tools/report_template.html;."
+          --add-data "tools/assets/hypnus-logo.png;assets"
+          --add-data "tools/assets/device.jpg;assets"
+          --add-data "tools/win/ui.html;."
+          tools/win/ihypnuscare_win.py
+
+      - name: Package
+        shell: pwsh
+        run: |
+          Compress-Archive -Path dist/iHypnusCare.exe -DestinationPath "iHypnusCare-${{ inputs.tag }}-Windows-x64.zip"
+          Get-FileHash "iHypnusCare-${{ inputs.tag }}-Windows-x64.zip" -Algorithm SHA256 | Format-List
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: iHypnusCare-${{ inputs.tag }}-Windows-x64
+          path: iHypnusCare-${{ inputs.tag }}-Windows-x64.zip
+
+      - name: Attach to release
+        if: ${{ inputs.attach }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload ${{ inputs.tag }} "iHypnusCare-${{ inputs.tag }}-Windows-x64.zip" --clobber

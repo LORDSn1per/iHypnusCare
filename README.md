@@ -43,6 +43,18 @@ Hypnus machines record detailed data to their SD card, but the free tools most C
 
 The card is **only ever read**. Nothing on it is changed, and nothing is uploaded. PDF export downloads the jsPDF library from a CDN the first time you use it, so that step needs internet.
 
+## Download
+
+Get **[iHypnusCare-v2.0-macOS-arm64.zip](https://github.com/LORDSn1per/iHypnusCare/releases/latest)** from the latest release, unzip it, and drag **iHypnusCare.app** to Applications.
+
+The app isn't signed with an Apple Developer ID, so macOS blocks it the first time. Open **System Settings → Privacy & Security** and click **Open Anyway**, or run:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/iHypnusCare.app
+```
+
+Or build it yourself from source (see [Build](#build)).
+
 ## Requirements
 
 - macOS 13 or later on Apple Silicon.

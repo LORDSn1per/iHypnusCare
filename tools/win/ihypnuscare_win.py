@@ -103,8 +103,8 @@ class Api:
                     js(f"progress({done}, {total}, {json.dumps(name)}, {files})")
 
             root = reader.find_root(folder)
-            out = os.path.join(DATA_DIR, "report.html")
-            os.makedirs(DATA_DIR, exist_ok=True)
+            # pywebview's local server only serves the start page's folder, so the report goes beside ui.html
+            out = os.path.join(os.path.dirname(UI), "report.html")
             reader.write_html(root, out, progress=progress)
             s = load_settings()
             s["last_folder"] = folder

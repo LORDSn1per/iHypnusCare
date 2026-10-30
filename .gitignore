@@ -19,3 +19,4 @@ tools/win/app.ico
 build/
 dist/
 *.spec
+tools/win/report.html

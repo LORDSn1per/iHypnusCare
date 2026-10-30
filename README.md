@@ -73,6 +73,10 @@ python3 -I tools/hypnus_report.py "/Volumes/NO NAME" --html report.html --open  
 
 The card holds one folder per night of EDF-*like* files (an EDF-style 512-byte header, then binary records), plus a settings blob and a firmware log. The format was worked out from real card data and confirmed against Hypnus' own Windows viewer. [AGENTS.md](AGENTS.md) documents every file, record layout and setting offset, and explains how the machine's on-screen stats are calculated and cached back to the card.
 
+## License
+
+The code is released under the [MIT License](LICENSE). The license doesn't cover the Hypnus name, logo or device photo in `tools/assets/`.
+
 ## Disclaimer
 
 For personal information only. Not for diagnosis or treatment decisions. "Hypnus" and the Hypnus logo are trademarks of their owner, used here only to identify compatible devices.

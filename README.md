@@ -45,9 +45,9 @@ The card is **only ever read**. Nothing on it is changed, and nothing is uploade
 
 ## Download
 
-Get **[iHypnusCare-v2.0-macOS-arm64.zip](https://github.com/LORDSn1per/iHypnusCare/releases/latest)** from the latest release, unzip it, and drag **iHypnusCare.app** to Applications.
+Get **[iHypnusCare-v1.10-macOS-universal.zip](https://github.com/LORDSn1per/iHypnusCare/releases/latest)** from the latest release, unzip it, and drag **iHypnusCare.app** to Applications. One download runs natively on both Apple Silicon and Intel Macs.
 
-The app isn't signed with an Apple Developer ID, so macOS blocks it the first time. Open **System Settings → Privacy & Security** and click **Open Anyway**, or run:
+The app isn't signed with an Apple Developer ID, so macOS blocks it the first time. Open **System Settings → Privacy & Security** (on macOS 12 and older: **System Preferences → Security & Privacy → General**) and click **Open Anyway**, or run:
 
 ```bash
 xattr -dr com.apple.quarantine /Applications/iHypnusCare.app
@@ -57,8 +57,12 @@ Or build it yourself from source (see [Build](#build)).
 
 ## Requirements
 
-- macOS 13 or later on Apple Silicon.
-- Apple's Command Line Tools, which provide `python3` and `swiftc`. Install them with `xcode-select --install`.
+- **Apple Silicon:** macOS 11 Big Sur or later.
+- **Intel:** macOS 10.14.4 Mojave or later. That covers most Macs from 2012 onwards (older Macs need a supported macOS, for example via OpenCore Legacy Patcher).
+- **Python 3.8 or newer**, which reads the card:
+  - macOS 10.15 and later: run `xcode-select --install` once for Apple's Command Line Tools, or macOS will offer to install them.
+  - macOS 10.14 Mojave: install Python 3 from [python.org](https://www.python.org/downloads/macos/). The app also finds Python from Homebrew or MacPorts.
+- For the best-looking report on macOS 10.14 and 10.15, keep Safari updated (Safari 14 or later), because the report uses the system's web engine.
 - A Hypnus **Series 8** machine. Developed and tested with a CA820W APAP, firmware V1.08. Other Series 8 models (BA825, ST830, SV825) use the same card format, but their bilevel and ASV fields are less tested.
 
 ## Build
@@ -70,7 +74,7 @@ tools/app/build_app.sh
 open iHypnusCare.app
 ```
 
-The build compiles `tools/app/iHypnusCare.swift` (AppKit + WebKit, no Xcode project needed), bundles the Python reader and report template, and signs the app ad hoc for local use.
+Building needs Apple's Command Line Tools (`swiftc`). The build compiles `tools/app/iHypnusCare.swift` (AppKit + WebKit, no Xcode project needed) into one universal binary (arm64 for macOS 11+, x86_64 for macOS 10.14.4+), bundles the Python reader and report template, and signs the app ad hoc for local use.
 
 ## Command line
 

@@ -1,8 +1,8 @@
 // iHypnusCare: native Mac front end for tools/hypnus_report.py.
 // Welcome screen -> pick or drop a card -> progress while the reader runs -> report shown in a web view.
 // Build with tools/app/build_app.sh (bundles the Python reader, template and images in Resources/tools).
+// Universal: runs on macOS 10.14.4+ (Intel) and 11+ (Apple Silicon); newer APIs are behind #available.
 import Cocoa
-import UniformTypeIdentifiers
 import WebKit
 
 let brand = NSColor(srgbRed: 0.0, green: 0.624, blue: 0.890, alpha: 1)
@@ -19,6 +19,21 @@ func label(_ text: String, size: CGFloat, weight: NSFont.Weight = .regular, colo
     l.alignment = .center
     l.isSelectable = false
     return l
+}
+
+/// SF Symbol on macOS 11+, otherwise the named system image (or nil).
+func symbol(_ name: String, fallback: NSImage.Name? = nil) -> NSImage? {
+    if #available(macOS 11.0, *), let img = NSImage(systemSymbolName: name, accessibilityDescription: nil) { return img }
+    return fallback.flatMap { NSImage(named: $0) }
+}
+
+/// Small brand-coloured dot, used in place of SF Symbols before macOS 11.
+func dot() -> NSImage {
+    NSImage(size: NSSize(width: 18, height: 18), flipped: false) { r in
+        brand.setFill()
+        NSBezierPath(ovalIn: r.insetBy(dx: 5, dy: 5)).fill()
+        return true
+    }
 }
 
 // MARK: - Background view that accepts a dropped folder
@@ -90,7 +105,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         toolbar.delegate = self
         toolbar.displayMode = .iconAndLabel
         window.toolbar = toolbar
-        window.toolbarStyle = .unified
+        if #available(macOS 11.0, *) { window.toolbarStyle = .unified }
         showWelcome()
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
@@ -156,16 +171,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         if id == openID {
             item.label = "Open…"
             item.toolTip = "Open another SD card or folder"
-            item.image = NSImage(systemSymbolName: "sdcard", accessibilityDescription: "Open")
+            item.image = symbol("sdcard", fallback: NSImage.folderName)
             item.action = #selector(openFolder)
         } else {
             item.label = "Export PDF"
             item.toolTip = "Save the report for the selected dates as a PDF"
-            item.image = NSImage(systemSymbolName: "square.and.arrow.up", accessibilityDescription: "Export PDF")
+            item.image = symbol("square.and.arrow.up", fallback: NSImage.shareTemplateName)
             item.action = #selector(exportPDF)
         }
         item.target = self
-        item.isBordered = true
+        if #available(macOS 10.15, *) { item.isBordered = true }
         return item
     }
     @objc func validateToolbarItem(_ item: NSToolbarItem) -> Bool {
@@ -206,7 +221,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         features.orientation = .vertical
         features.alignment = .leading
         features.spacing = 12
-        for (symbol, text) in [
+        for (name, text) in [
             ("chart.bar.xaxis", "Usage, AHI, pressure and leak trends for any date range"),
             ("moon.zzz", "Night-by-night detail showing every apnea and hypopnea"),
             ("list.bullet.rectangle", "The compliance and therapy figures a sleep doctor looks for"),
@@ -216,8 +231,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
             let row = NSStackView()
             row.orientation = .horizontal
             row.spacing = 12
-            let icon = NSImageView(image: NSImage(systemSymbolName: symbol, accessibilityDescription: nil) ?? NSImage())
-            icon.symbolConfiguration = .init(pointSize: 17, weight: .regular)
+            let icon = NSImageView(image: symbol(name) ?? dot())
+            if #available(macOS 11.0, *) { icon.symbolConfiguration = .init(pointSize: 17, weight: .regular) }
             icon.contentTintColor = brand
             icon.translatesAutoresizingMaskIntoConstraints = false
             icon.widthAnchor.constraint(equalToConstant: 26).isActive = true
@@ -232,7 +247,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
 
         let button = NSButton(title: "Open SD Card or Folder…", target: self, action: #selector(openFolder))
         button.bezelStyle = .rounded
-        button.controlSize = .large
+        if #available(macOS 11.0, *) { button.controlSize = .large }
         button.font = .systemFont(ofSize: 15, weight: .semibold)
         button.bezelColor = brand
         button.keyEquivalent = "\r"
@@ -363,9 +378,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         try? FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
         let out = cacheDir.appendingPathComponent("report.html")
 
+        guard let python = findPython() else {
+            fail(Self.noPythonHelp)
+            return
+        }
         let p = Process()
-        p.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
-        p.arguments = ["-I", toolsDir.appendingPathComponent("hypnus_report.py").path, folder.path, "--html", out.path, "--progress"]
+        var args = ["-I", toolsDir.appendingPathComponent("hypnus_report.py").path, folder.path, "--html", out.path, "--progress"]
+        if Self.isTranslated {
+            // Intel build under Rosetta: children inherit x86_64, but Apple Silicon Python tools may be arm64-only
+            p.executableURL = URL(fileURLWithPath: "/usr/bin/arch")
+            args = ["-arm64", "-x86_64", python.path] + args
+        } else {
+            p.executableURL = python
+        }
+        p.arguments = args
         let stdout = Pipe(), stderr = Pipe()
         p.standardOutput = stdout
         p.standardError = stderr
@@ -398,8 +424,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
             try p.run()
             process = p
         } catch {
-            fail("Couldn't start Python (/usr/bin/python3). Install Apple's Command Line Tools with: xcode-select --install\n\n\(error.localizedDescription)")
+            fail("Couldn't start Python (\(python.path)).\n\n\(Self.noPythonHelp)\n\n\(error.localizedDescription)")
         }
+    }
+
+    static let noPythonHelp = """
+        iHypnusCare needs Python 3.8 or newer to read the card.
+        On macOS 10.15 or later: open Terminal and run  xcode-select --install
+        On older macOS: install Python 3 from python.org, then try again.
+        """
+
+    /// True when this process is the Intel slice running under Rosetta on Apple Silicon.
+    static let isTranslated: Bool = {
+        var value: Int32 = 0
+        var size = MemoryLayout<Int32>.size
+        return sysctlbyname("sysctl.proc_translated", &value, &size, nil, 0) == 0 && value == 1
+    }()
+
+    /// Python 3 from python.org, Homebrew or MacPorts, else Apple's (needs the Command Line Tools on 10.15+, absent before).
+    func findPython() -> URL? {
+        let candidates = [
+            "/Library/Frameworks/Python.framework/Versions/Current/bin/python3",
+            "/opt/homebrew/bin/python3", "/usr/local/bin/python3", "/opt/local/bin/python3",
+            "/usr/bin/python3",
+        ]
+        return candidates.first { FileManager.default.isExecutableFile(atPath: $0) }.map { URL(fileURLWithPath: $0) }
     }
 
     func updateProgress(done: Int, total: Int, files: Int, folder: String) {
@@ -452,7 +501,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         guard let body = message.body as? [String: Any], body["type"] as? String == "pdf",
               let b64 = body["data"] as? String, let data = Data(base64Encoded: b64) else { return }
         let panel = NSSavePanel()
-        panel.allowedContentTypes = [.pdf]
+        panel.allowedFileTypes = ["pdf"]   // works on every supported macOS (allowedContentTypes needs 11+)
         panel.nameFieldStringValue = body["name"] as? String ?? "CPAP report.pdf"
         panel.directoryURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
         panel.beginSheetModal(for: window) { [weak self] resp in

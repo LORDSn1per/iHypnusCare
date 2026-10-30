@@ -22,7 +22,7 @@ header.top .wrap { display: flex; align-items: center; gap: 20px; padding-top: 1
 header.top img { height: 46px; width: auto; }
 header.top h1 { font-size: 20px; margin: 0; font-weight: 600; }
 header.top .sub { color: var(--ink2); font-size: 13px; }
-.controls { position: sticky; top: 0; z-index: 5; background: var(--page); border-bottom: 1px solid var(--border); }
+.controls { position: -webkit-sticky; position: sticky; top: 0; z-index: 5; background: var(--page); border-bottom: 1px solid var(--border); }
 .controls .wrap { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; padding-top: 10px; padding-bottom: 10px; }
 .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--card); }
 .seg button { border: 0; background: none; padding: 7px 11px; font: inherit; font-size: 13px; cursor: pointer; color: var(--ink2); }
@@ -75,7 +75,7 @@ table.s tr:last-child td { border-bottom: 0; }
 #tip .k { display: inline-block; width: 12px; height: 2px; border-radius: 1px; }
 .scroll { max-height: 560px; overflow: auto; border-top: 1px solid var(--grid); }
 table.n { width: 100%; border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; }
-table.n th { text-align: right; color: var(--ink2); font-weight: 500; padding: 7px 6px; border-bottom: 1px solid var(--axis); position: sticky; top: 0; background: var(--card); white-space: nowrap; }
+table.n th { text-align: right; color: var(--ink2); font-weight: 500; padding: 7px 6px; border-bottom: 1px solid var(--axis); position: -webkit-sticky; position: sticky; top: 0; background: var(--card); white-space: nowrap; }
 table.n td { text-align: right; padding: 5px 6px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
 table.n th:first-child, table.n td:first-child { text-align: left; }
 table.n tr.off td { color: var(--muted); }
@@ -162,6 +162,10 @@ const DATA = /*__DATA__*/null;
 </script>
 <script>
 "use strict";
+// Older WebKit (macOS 10.14/10.15 without Safari 14): add replaceChildren
+for (const P of [Element.prototype, Document.prototype, DocumentFragment.prototype]) {
+  if (!P.replaceChildren) P.replaceChildren = function (...nodes) { while (this.lastChild) this.removeChild(this.lastChild); this.append(...nodes); };
+}
 // ---------- constants & helpers ----------
 const C = { surface: "#fcfcfb", card: "#ffffff", ink: "#0b0b0b", ink2: "#52514e", muted: "#898781", grid: "#e1e0d9",
   axis: "#c3c2b7", brand: "#009fe3", s1: "#2a78d6", oa: "#eb6834", h: "#1baf7a", ca: "#eda100", csr: "#6250d6",
@@ -389,7 +393,7 @@ function drawChart(o) {
       if (o.B.mode === "day" && BY.get(b.from) && BY.get(b.from).hours > 0) hit.style.cursor = "pointer";
       hit.addEventListener("pointermove", (e) => { hover.setAttribute("x", m.l + bw * i); hover.setAttribute("opacity", 0.05); showTip(e, b.label, o.tip(b)); });
       hit.addEventListener("pointerleave", () => { hover.setAttribute("opacity", 0); hideTip(); });
-      hit.addEventListener("click", () => { if (o.B.mode === "day" && BY.get(b.from)?.hours > 0) selectNight(b.from, true); });
+      hit.addEventListener("click", () => { if (o.B.mode === "day" && BY.get(b.from) && BY.get(b.from).hours > 0) selectNight(b.from, true); });
     });
   }
   return svg;
@@ -416,7 +420,7 @@ const CHARTS = [
     series: [{ label: "Hours used", color: C.s1, get: (s) => s.avgAll }],
     tip: (b) => b.days.length > 1
       ? [{ label: "Average use", value: fmtH(b.s.avgAll) }, { label: "Nights used", value: `${b.s.used} of ${b.days.length}` }, { label: "Nights 4h+", value: String(b.s.used4) }]
-      : [{ label: "Used", value: b.s.used ? fmtH(b.s.hrs) : "Not used" }, { label: "Sessions", value: String(BY.get(b.from)?.ses.filter((s) => s[2] >= 60).length ?? 0) }] },
+      : [{ label: "Used", value: b.s.used ? fmtH(b.s.hrs) : "Not used" }, { label: "Sessions", value: String(BY.get(b.from) ? BY.get(b.from).ses.filter((s) => s[2] >= 60).length : 0) }] },
   { id: "ahi", title: "Events per hour", unit: "AHI", kind: "stack", yMin: 6, ref: { v: 5, label: "AHI 5" },
     series: [{ label: "Obstructive apnea", color: C.oa, get: (s) => s.oai }, { label: "Hypopnea", color: C.h, get: (s) => s.hi }, { label: "Central apnea", color: C.ca, get: (s) => s.cai }],
     tip: (b) => [{ label: "AHI", value: f1(b.s.ahi) }, { label: "Obstructive", color: C.oa, value: `${f1(b.s.oai)} (${b.s.oa})` }, { label: "Hypopnea", color: C.h, value: `${f1(b.s.hi)} (${b.s.h})` }, { label: "Central", color: C.ca, value: `${f1(b.s.cai)} (${b.s.ca})` }] },
@@ -672,7 +676,7 @@ function render() {
       h("td", {}, `${fmtWd(d)} ${fmtDate(d)}`), h("td", {}, clock(ses[0][0])), h("td", {}, clock(ses[ses.length - 1][1])),
       h("td", {}, fmtH(n.hours)), h("td", {}, real.length), h("td", {}, f1(s.ahi)), h("td", {}, s.oa), h("td", {}, s.h), h("td", {}, s.ca),
       h("td", {}, f1(s.p95)), h("td", {}, f0(s.l95)), h("td", {}, s.lbig == null ? "-" : (s.lbig * 100).toFixed(1) + "%"),
-      h("td", {}, n.rr ?? "-"), h("td", {}, n.tv == null ? "-" : n.tv + " mL"));
+      h("td", {}, n.rr == null ? "-" : n.rr), h("td", {}, n.tv == null ? "-" : n.tv + " mL"));
   });
   $("#nightTable").replaceChildren(h("thead", {}, h("tr", {}, ...head.map((x) => h("th", {}, x)))), h("tbody", {}, ...body));
 
@@ -809,7 +813,7 @@ async function makePdf() {
       if (!n || !(n.hours > 0)) return [`${fmtWd(d)} ${fmtDate(d)}`, "", "", "Not used", "", "", "", "", "", "", "", "", ""];
       const real = n.ses.filter((x) => x[2] >= 60), ses = real.length ? real : n.ses;
       return [`${fmtWd(d)} ${fmtDate(d)}`, clock(ses[0][0]), clock(ses[ses.length - 1][1]), fmtH(n.hours), f1(s.ahi), s.oa, s.h, s.ca,
-        f1(s.p95), f0(s.l95), s.lbig == null ? "-" : (s.lbig * 100).toFixed(1) + "%", n.rr ?? "-", n.tv ?? "-"];
+        f1(s.p95), f0(s.l95), s.lbig == null ? "-" : (s.lbig * 100).toFixed(1) + "%", n.rr == null ? "-" : n.rr, n.tv == null ? "-" : n.tv];
     });
     doc.autoTable({
       startY: 28, margin: { left: M, right: M, top: 28 }, head: [head], body, theme: "plain",

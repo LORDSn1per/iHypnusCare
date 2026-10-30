@@ -1,0 +1,863 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CPAP Therapy Report</title>
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7; --card: #ffffff; --surface: #fcfcfb;
+  --ink: #0b0b0b; --ink2: #52514e; --muted: #898781;
+  --grid: #e1e0d9; --axis: #c3c2b7; --border: rgba(11,11,11,0.10);
+  --brand: #009fe3;
+  --s1: #2a78d6; --oa: #eb6834; --h: #1baf7a; --ca: #eda100; --p50: #86b6ef; --p95: #1c5cab;
+  --good: #0ca30c; --warn: #fab219; --serious: #ec835a; --crit: #d03b3b;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--ink); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+.wrap { max-width: 1100px; margin: 0 auto; padding: 0 16px; }
+header.top { background: var(--card); border-bottom: 3px solid var(--brand); }
+header.top .wrap { display: flex; align-items: center; gap: 20px; padding-top: 14px; padding-bottom: 14px; }
+header.top img { height: 46px; width: auto; }
+header.top h1 { font-size: 20px; margin: 0; font-weight: 600; }
+header.top .sub { color: var(--ink2); font-size: 13px; }
+.controls { position: sticky; top: 0; z-index: 5; background: var(--page); border-bottom: 1px solid var(--border); }
+.controls .wrap { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; padding-top: 10px; padding-bottom: 10px; }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--card); }
+.seg button { border: 0; background: none; padding: 7px 11px; font: inherit; font-size: 13px; cursor: pointer; color: var(--ink2); }
+.seg button + button { border-left: 1px solid var(--border); }
+.seg button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+.seg button:hover:not([aria-pressed="true"]) { background: rgba(11,11,11,0.04); }
+label.inl { display: inline-flex; align-items: center; gap: 6px; color: var(--ink2); font-size: 13px; }
+input[type=date], input[type=text], select { font: inherit; font-size: 13px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); color: var(--ink); }
+.btn { font: inherit; font-size: 13px; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--s1); background: var(--s1); color: #fff; cursor: pointer; font-weight: 600; }
+.btn:disabled { opacity: 0.6; cursor: progress; }
+.spacer { flex: 1; }
+#pdfStatus { color: var(--ink2); font-size: 12.5px; }
+main { padding-bottom: 40px; }
+section { margin-top: 18px; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; }
+h2 { font-size: 15px; margin: 0 0 8px; font-weight: 600; }
+.note { color: var(--ink2); font-size: 12.5px; }
+.device { display: grid; grid-template-columns: 170px 1fr; gap: 20px; align-items: center; }
+.device img { width: 100%; height: auto; }
+dl.kv { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px 20px; margin: 0; }
+dl.kv dt { color: var(--muted); font-size: 12px; }
+dl.kv dd { margin: 0; font-weight: 500; }
+.patient { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--grid); }
+.tiles { display: grid; grid-template-columns: 1.3fr repeat(4, 1fr); gap: 12px; }
+.tile .label { color: var(--ink2); font-size: 13px; }
+.tile .value { font-size: 28px; font-weight: 600; margin-top: 2px; line-height: 1.15; }
+.tile .value small { font-size: 14px; font-weight: 500; color: var(--ink2); }
+.tile.hero .value { font-size: 52px; line-height: 1.05; }
+.tile .sub { color: var(--ink2); font-size: 12.5px; margin-top: 2px; }
+.status { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink2); margin-top: 6px; }
+.status svg { flex: none; }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+table.s { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.s td { padding: 4px 0; border-bottom: 1px solid var(--grid); vertical-align: top; }
+table.s td:last-child { text-align: right; font-variant-numeric: tabular-nums; font-weight: 500; padding-left: 10px; }
+table.s tr:last-child td { border-bottom: 0; }
+.charts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.chart svg { display: block; width: 100%; height: auto; }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--ink2); margin: 0 0 6px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend .sw { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
+.legend .ln { width: 16px; height: 2px; border-radius: 1px; display: inline-block; }
+.nighthead { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-bottom: 8px; }
+.nighthead h2 { margin: 0; }
+#tip { position: fixed; pointer-events: none; background: var(--card); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,0.08); padding: 8px 10px; font-size: 12.5px; display: none; z-index: 20; min-width: 170px; }
+#tip .t { color: var(--ink2); margin-bottom: 4px; }
+#tip .r { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+#tip .r span { color: var(--ink2); display: inline-flex; align-items: center; gap: 6px; }
+#tip .r b { font-variant-numeric: tabular-nums; font-weight: 600; }
+#tip .k { display: inline-block; width: 12px; height: 2px; border-radius: 1px; }
+.scroll { max-height: 560px; overflow: auto; border-top: 1px solid var(--grid); }
+table.n { width: 100%; border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+table.n th { text-align: right; color: var(--ink2); font-weight: 500; padding: 7px 6px; border-bottom: 1px solid var(--axis); position: sticky; top: 0; background: var(--card); white-space: nowrap; }
+table.n td { text-align: right; padding: 5px 6px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+table.n th:first-child, table.n td:first-child { text-align: left; }
+table.n tr.off td { color: var(--muted); }
+table.n tbody tr.on { cursor: pointer; }
+table.n tbody tr.on:hover td { background: rgba(42,120,214,0.06); }
+table.n tbody tr.sel td { background: rgba(42,120,214,0.10); }
+footer { color: var(--ink2); font-size: 12px; margin-top: 24px; }
+footer p { margin: 6px 0; }
+@media (max-width: 900px) {
+  .tiles { grid-template-columns: 1fr 1fr; }
+  .tile.hero { grid-column: 1 / -1; }
+  .stats, .charts { grid-template-columns: 1fr; }
+  .device { grid-template-columns: 1fr; }
+  .device img { max-width: 200px; }
+}
+@media print { .controls { display: none; } body { background: #fff; } }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <img id="logo" alt="Hypnus">
+    <div>
+      <h1>CPAP Therapy Report</h1>
+      <div class="sub" id="headSub"></div>
+    </div>
+  </div>
+</header>
+
+<div class="controls">
+  <div class="wrap">
+    <div class="seg" id="presets" role="group" aria-label="Date range"></div>
+    <label class="inl">From <input type="date" id="from"></label>
+    <label class="inl">To <input type="date" id="to"></label>
+    <span class="spacer"></span>
+    <span id="pdfStatus" aria-live="polite"></span>
+    <button class="btn" id="pdfBtn" type="button">Download PDF</button>
+  </div>
+</div>
+
+<main class="wrap">
+  <section class="card">
+    <div class="device">
+      <img id="photo" alt="Hypnus Series 8 CPAP machine">
+      <div>
+        <dl class="kv" id="deviceKv"></dl>
+        <div class="patient">
+          <label class="inl">Patient name <input type="text" id="pname" placeholder="Optional" autocomplete="off"></label>
+          <label class="inl">Date of birth <input type="text" id="pdob" placeholder="Optional" autocomplete="off" size="12"></label>
+          <label class="inl"><input type="checkbox" id="pdfNight"> Include selected night in PDF</label>
+          <label class="inl"><input type="checkbox" id="hideSerial"> Hide serial number</label>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="tiles" id="tiles"></section>
+  <section class="stats" id="stats"></section>
+
+  <section class="charts" id="charts"></section>
+
+  <section class="card">
+    <div class="nighthead">
+      <h2>Night detail</h2>
+      <select id="nightSel" aria-label="Night"></select>
+      <span class="note">Click a bar or a table row to pick a night.</span>
+    </div>
+    <div class="legend" id="nightLegend"></div>
+    <div class="chart" id="nightChart"></div>
+  </section>
+
+  <section class="card">
+    <h2>Nightly data</h2>
+    <p class="note" style="margin:0 0 8px">Each row is one therapy night, noon to noon. Times are the machine's clock.</p>
+    <div class="scroll"><table class="n" id="nightTable"></table></div>
+  </section>
+
+  <footer id="notes"></footer>
+</main>
+<div id="tip" role="tooltip"></div>
+
+<script>
+const DATA = /*__DATA__*/null;
+</script>
+<script>
+"use strict";
+// ---------- constants & helpers ----------
+const C = { surface: "#fcfcfb", card: "#ffffff", ink: "#0b0b0b", ink2: "#52514e", muted: "#898781", grid: "#e1e0d9",
+  axis: "#c3c2b7", brand: "#009fe3", s1: "#2a78d6", oa: "#eb6834", h: "#1baf7a", ca: "#eda100", csr: "#6250d6",
+  sn: "#e87ba4", p50: "#86b6ef", p95: "#1c5cab", good: "#0ca30c", warn: "#fab219", serious: "#ec835a", crit: "#d03b3b" };
+const LIBS = [
+  "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js",
+  "https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js",
+  "https://cdn.jsdelivr.net/npm/svg2pdf.js@2.2.3/dist/svg2pdf.umd.min.js",
+];
+const NATIVE = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.cpap;   // set by iHypnusCare.app
+const NS = "http://www.w3.org/2000/svg";
+const FONT = "Helvetica, Arial, sans-serif";
+const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const WD = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const PERIODS = ["1 day", "1 week", "2 weeks", "1 month", "3 months", "6 months", "1 year"];
+const $ = (s) => document.querySelector(s);
+
+function h(tag, attrs = {}, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "style") e.style.cssText = v; else if (k.startsWith("on")) e.addEventListener(k.slice(2), v); else e.setAttribute(k, v);
+  }
+  for (const k of kids) if (k != null) e.append(k instanceof Node ? k : document.createTextNode(String(k)));
+  return e;
+}
+function sv(tag, attrs, parent, text) {
+  const e = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs || {})) e.setAttribute(k, v);
+  if (text != null) e.textContent = text;
+  if (parent) parent.appendChild(e);
+  return e;
+}
+const store = {
+  get(k, d) { try { const v = localStorage.getItem("cpapReport." + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem("cpapReport." + k, JSON.stringify(v)); } catch {} },
+};
+
+const D = (s) => new Date(s + "T00:00:00Z");
+const iso = (d) => d.toISOString().slice(0, 10);
+const addDays = (s, k) => { const d = D(s); d.setUTCDate(d.getUTCDate() + k); return iso(d); };
+const dayDiff = (a, b) => Math.round((D(b) - D(a)) / 864e5);
+const fmtDate = (s) => { const d = D(s); return `${d.getUTCDate()} ${MON[d.getUTCMonth()]} ${d.getUTCFullYear()}`; };
+const fmtShort = (s) => { const d = D(s); return `${d.getUTCDate()} ${MON[d.getUTCMonth()]}`; };
+const fmtWd = (s) => WD[D(s).getUTCDay()];
+const clock = (t) => t.slice(11, 16);
+const fmtH = (hrs) => { if (hrs == null) return "-"; const m = Math.round(hrs * 60); return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, "0")}m`; };
+const f1 = (v) => (v == null || !isFinite(v) ? "-" : v.toFixed(1));
+const f2 = (v) => (v == null || !isFinite(v) ? "-" : v.toFixed(2));
+const f0 = (v) => (v == null || !isFinite(v) ? "-" : Math.round(v).toLocaleString("en"));
+const pctTxt = (a, b) => (b ? `${Math.round((a / b) * 100)}%` : "-");
+const localMs = (t) => new Date(t).getTime();   // ISO without zone = machine clock, same basis everywhere
+
+// ---------- data prep ----------
+const NIGHTS = DATA.nights;
+const BY = new Map(NIGHTS.map((n) => [n.d, n]));
+for (const n of NIGHTS) {
+  n.cnt = {};
+  for (const k in n.ev) n.cnt[k] = n.ev[k].length;
+  n.longest = Math.max(0, ...n.ses.map((s) => s[2])) / 3600;
+  n.csrS = (n.ev.csr || []).reduce((a, e) => a + e[1], 0);
+}
+const USED = NIGHTS.filter((n) => n.hours > 0);
+const FIRST = USED.length ? USED[0].d : NIGHTS[0].d;
+const LAST = USED.length ? USED[USED.length - 1].d : NIGHTS[NIGHTS.length - 1].d;
+
+function addHist(acc, hist) { for (const k in hist) acc.set(+k, (acc.get(+k) || 0) + hist[k]); }
+function histQ(acc, q) {
+  const keys = [...acc.keys()].sort((a, b) => a - b);
+  let tot = 0; for (const k of keys) tot += acc.get(k);
+  if (!tot) return null;
+  let c = 0; const t = q * tot;
+  for (const k of keys) { c += acc.get(k); if (c >= t) return k; }
+  return keys[keys.length - 1];
+}
+function histMean(acc) { let s = 0, n = 0; for (const [k, v] of acc) { s += k * v; n += v; } return n ? s / n : null; }
+function histAbove(acc, thr) { let a = 0, n = 0; for (const [k, v] of acc) { n += v; if (k > thr) a += v; } return n ? a / n : null; }
+const div = (v, d) => (v == null ? null : v / d);
+
+function summarize(list, nDays) {
+  const used = list.filter((n) => n.hours > 0);
+  const hrs = used.reduce((a, n) => a + n.hours, 0);
+  const cnt = (k) => used.reduce((a, n) => a + (n.cnt[k] || 0), 0);
+  const ph = new Map(), lh = new Map();
+  for (const n of used) { addHist(ph, n.ph); addHist(lh, n.lh); }
+  const wavg = (k) => { let s = 0, w = 0; for (const n of used) if (n[k] != null) { s += n[k] * n.hours; w += n.hours; } return w ? s / w : null; };
+  const usages = used.map((n) => n.hours).sort((a, b) => a - b);
+  const oa = cnt("oa"), hh = cnt("h"), ca = cnt("ca");
+  const o2mins = used.map((n) => n.o2min).filter((v) => v != null);
+  return {
+    nDays, used: used.length, used4: used.filter((n) => n.hours >= 4).length, used4one: used.filter((n) => n.longest >= 4).length,
+    hrs, avgAll: nDays ? hrs / nDays : 0, avgUsed: used.length ? hrs / used.length : null,
+    medUsed: usages.length ? usages[Math.floor(usages.length / 2)] : null,
+    oa, h: hh, ca, sn: cnt("sn"), pb: cnt("pb"), fl: cnt("fl"), lk: used.reduce((a, n) => a + n.lk, 0),
+    csrS: used.reduce((a, n) => a + n.csrS, 0),
+    ahi: hrs ? (oa + hh + ca) / hrs : null, oai: hrs ? oa / hrs : null, hi: hrs ? hh / hrs : null, cai: hrs ? ca / hrs : null,
+    ahiMachine: hrs ? (oa + hh) / hrs : null,
+    p50: div(histQ(ph, 0.5), 10), p90: div(histQ(ph, 0.9), 10), p95: div(histQ(ph, 0.95), 10), pmax: div(histQ(ph, 1), 10),
+    l50: histQ(lh, 0.5), l90: histQ(lh, 0.9), l95: histQ(lh, 0.95), lmax: histQ(lh, 1), lmean: histMean(lh), lbig: histAbove(lh, 24),
+    rr: wavg("rr"), tv: wavg("tv"), mv: wavg("mv"), ie: wavg("ie"), ti: wavg("ti"),
+    o2: wavg("o2"), o2min: o2mins.length ? Math.min(...o2mins) : null, hr: wavg("hr"),
+  };
+}
+const NIGHT_STATS = new Map(NIGHTS.map((n) => [n.d, summarize([n], 1)]));
+
+function settingsAt(day) {
+  // settings in force at the end of `day` (noon next day); falls back to the first record
+  const cut = addDays(day, 1) + "T12:00:00";
+  let cur = DATA.settings[0] ? DATA.settings[0][1] : null;
+  for (const [t, s] of DATA.settings) if (t <= cut) cur = s;
+  return cur;
+}
+function settingsChanges(from, to) {
+  const a = from + "T12:00:00", b = addDays(to, 1) + "T12:00:00";
+  return DATA.settings.filter(([t]) => t > a && t <= b);
+}
+function modeText(s) {
+  if (!s) return "-";
+  if (s.mode === "CPAP") return `CPAP ${f1(s.cpap)} cmH2O`;
+  if (s.mode === "APAP") return `APAP ${f1(s.min)}-${f1(s.max)} cmH2O`;
+  if (s.mode.includes("BPAP")) return `${s.mode} IPAP ${f1(s.ipap)} / EPAP ${f1(s.epap)} cmH2O`;
+  return s.mode;
+}
+
+// ---------- state ----------
+const PRESETS = [["7 days", 7], ["30 days", 30], ["90 days", 90], ["6 months", 182], ["1 year", 365], ["All", 0]];
+let R = store.get("range", { preset: 30 });
+let SEL = null;   // selected night date
+function applyPreset(p) {
+  R.preset = p; R.to = LAST;
+  R.from = p ? addDays(LAST, -(p - 1)) : FIRST;
+  if (R.from < FIRST) R.from = FIRST;
+}
+if (R.preset != null) applyPreset(R.preset);
+if (!R.from || !R.to || R.from < FIRST || R.to > LAST || R.from > R.to) applyPreset(30);
+
+function rangeDays() { const n = dayDiff(R.from, R.to) + 1; return Array.from({ length: n }, (_, i) => addDays(R.from, i)); }
+function rangeNights() { return rangeDays().map((d) => BY.get(d)).filter(Boolean); }
+
+function buckets() {
+  const days = rangeDays(), n = days.length;
+  const mode = n <= 120 ? "day" : n <= 730 ? "week" : "month";
+  const out = [];
+  if (mode === "day") days.forEach((d) => out.push({ from: d, to: d, days: [d] }));
+  else if (mode === "week") for (let i = 0; i < n; i += 7) { const ds = days.slice(i, i + 7); out.push({ from: ds[0], to: ds[ds.length - 1], days: ds }); }
+  else { let cur = null; for (const d of days) { if (!cur || cur.key !== d.slice(0, 7)) { cur = { key: d.slice(0, 7), from: d, days: [] }; out.push(cur); } cur.days.push(d); cur.to = d; } }
+  for (const b of out) {
+    b.s = mode === "day" ? (NIGHT_STATS.get(b.from) || summarize([], 1)) : summarize(b.days.map((d) => BY.get(d)).filter(Boolean), b.days.length);
+    b.label = mode === "day" ? `${fmtWd(b.from)} ${fmtDate(b.from)}` : mode === "week" ? `${fmtShort(b.from)} - ${fmtDate(b.to)}` : `${MON[+b.from.slice(5, 7) - 1]} ${b.from.slice(0, 4)}`;
+  }
+  return { mode, list: out };
+}
+
+// ---------- charts ----------
+function scaleY(v, minMax) {
+  v = Math.max(v || 0, minMax);
+  const steps = [0.5, 1, 2, 2.5, 4, 5, 10, 20, 25, 50, 100, 200, 500];
+  const step = steps.find((s) => v / s <= 5) || Math.ceil(v / 5);
+  return { max: Math.ceil(v / step - 1e-9) * step, step };
+}
+function roundTop(x, y0, y1, w, r) {
+  r = Math.min(r, w / 2, Math.max(0, y0 - y1));
+  return `M${x},${y0}V${y1 + r}Q${x},${y1} ${x + r},${y1}H${x + w - r}Q${x + w},${y1} ${x + w},${y1 + r}V${y0}Z`;
+}
+
+/* o: { B, kind: 'bars'|'stack'|'lines', series: [{label,color,get}], ref: {v,label}, yMin, unit, fmt, tip, onPick, W, H, pdf } */
+function drawChart(o) {
+  const W = o.W || 720, H = o.H || 230, m = { l: 40, r: o.ref ? 50 : 12, t: 12, b: 28 };
+  const pw = W - m.l - m.r, ph = H - m.t - m.b;
+  const svg = sv("svg", { viewBox: `0 0 ${W} ${H}`, width: W, height: H, "font-family": FONT, role: "img" });
+  const B = o.B.list, n = B.length, bw = pw / n;
+  const top = B.map((b) => o.kind === "stack" ? o.series.reduce((a, s) => a + (s.get(b.s) || 0), 0) : Math.max(0, ...o.series.map((s) => s.get(b.s) || 0)));
+  const { max, step } = scaleY(Math.max(...top, o.ref ? o.ref.v * 1.2 : 0), o.yMin || 1);
+  const y = (v) => m.t + ph - (v / max) * ph;
+  for (let v = 0; v <= max + 1e-9; v += step) {
+    sv("line", { x1: m.l, x2: W - m.r, y1: y(v), y2: y(v), stroke: v === 0 ? C.axis : C.grid, "stroke-width": 1 }, svg);
+    sv("text", { x: m.l - 6, y: y(v) + 4, "text-anchor": "end", "font-size": 11, fill: C.muted }, svg, String(+v.toFixed(1)));
+  }
+  if (o.ref) {
+    sv("line", { x1: m.l, x2: W - m.r, y1: y(o.ref.v), y2: y(o.ref.v), stroke: C.ink2, "stroke-width": 1 }, svg);
+    sv("text", { x: W - m.r + 6, y: y(o.ref.v) + 4, "font-size": 11, fill: C.ink2 }, svg, o.ref.label);
+  }
+  const barW = Math.max(1, Math.min(24, bw * 0.72));
+  if (o.kind !== "lines") {
+    B.forEach((b, i) => {
+      const x = m.l + bw * i + (bw - barW) / 2;
+      const segs = o.series.map((s) => ({ s, v: s.get(b.s) || 0 })).filter((g) => g.v > 0);
+      let base = 0;
+      segs.forEach((g, j) => {
+        const y0 = y(base) - (j > 0 ? 2 : 0), y1 = y(base + g.v);
+        base += g.v;
+        if (y0 - y1 < 0.5) return;
+        const last = j === segs.length - 1;
+        if (last && barW >= 6) sv("path", { d: roundTop(x, y0, y1, barW, 4), fill: g.s.color }, svg);
+        else sv("rect", { x, y: y1, width: barW, height: y0 - y1, fill: g.s.color }, svg);
+      });
+    });
+  } else {
+    for (const s of o.series) {
+      let d = "", pen = false;
+      const pts = [];
+      B.forEach((b, i) => {
+        const v = s.get(b.s);
+        if (v == null) { pen = false; return; }
+        const px = m.l + bw * i + bw / 2, py = y(v);
+        d += (pen ? "L" : "M") + px.toFixed(1) + "," + py.toFixed(1); pen = true;
+        pts.push([px, py]);
+      });
+      sv("path", { d, fill: "none", stroke: s.color, "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }, svg);
+      if (n <= 62) for (const [px, py] of pts) sv("circle", { cx: px, cy: py, r: 3.5, fill: s.color, stroke: C.card, "stroke-width": 2 }, svg);
+    }
+  }
+  // x labels
+  const minGap = o.B.mode === "month" ? 44 : 46;
+  const every = Math.max(1, Math.ceil(minGap / bw));
+  B.forEach((b, i) => {
+    if (i % every) return;
+    const lab = o.B.mode === "month" ? `${MON[+b.from.slice(5, 7) - 1]} ${b.from.slice(2, 4)}` : fmtShort(b.from);
+    sv("text", { x: m.l + bw * i + bw / 2, y: H - 9, "text-anchor": "middle", "font-size": 11, fill: C.muted }, svg, lab);
+  });
+  if (!o.pdf) {
+    const hover = sv("rect", { x: 0, y: m.t, width: bw, height: ph, fill: C.ink, opacity: 0, "pointer-events": "none" }, svg);
+    svg.insertBefore(hover, svg.firstChild);
+    B.forEach((b, i) => {
+      const hit = sv("rect", { x: m.l + bw * i, y: m.t, width: bw, height: ph + 18, fill: "transparent" }, svg);
+      if (o.B.mode === "day" && BY.get(b.from) && BY.get(b.from).hours > 0) hit.style.cursor = "pointer";
+      hit.addEventListener("pointermove", (e) => { hover.setAttribute("x", m.l + bw * i); hover.setAttribute("opacity", 0.05); showTip(e, b.label, o.tip(b)); });
+      hit.addEventListener("pointerleave", () => { hover.setAttribute("opacity", 0); hideTip(); });
+      hit.addEventListener("click", () => { if (o.B.mode === "day" && BY.get(b.from)?.hours > 0) selectNight(b.from, true); });
+    });
+  }
+  return svg;
+}
+
+function showTip(e, title, rows) {
+  const t = $("#tip");
+  t.replaceChildren(h("div", { class: "t" }, title));
+  for (const r of rows) {
+    const k = r.color ? h("i", { class: "k", style: `background:${r.color}` }) : null;
+    t.append(h("div", { class: "r" }, h("span", {}, k, r.label), h("b", {}, r.value)));
+  }
+  t.style.display = "block";
+  const w = t.offsetWidth, hh = t.offsetHeight;
+  let x = e.clientX + 14, y = e.clientY + 14;
+  if (x + w > innerWidth - 8) x = e.clientX - w - 14;
+  if (y + hh > innerHeight - 8) y = e.clientY - hh - 14;
+  t.style.left = x + "px"; t.style.top = y + "px";
+}
+function hideTip() { $("#tip").style.display = "none"; }
+
+const CHARTS = [
+  { id: "usage", title: "Usage", unit: "hours", kind: "bars", yMin: 8, ref: { v: 4, label: "4 h" },
+    series: [{ label: "Hours used", color: C.s1, get: (s) => s.avgAll }],
+    tip: (b) => b.days.length > 1
+      ? [{ label: "Average use", value: fmtH(b.s.avgAll) }, { label: "Nights used", value: `${b.s.used} of ${b.days.length}` }, { label: "Nights 4h+", value: String(b.s.used4) }]
+      : [{ label: "Used", value: b.s.used ? fmtH(b.s.hrs) : "Not used" }, { label: "Sessions", value: String(BY.get(b.from)?.ses.filter((s) => s[2] >= 60).length ?? 0) }] },
+  { id: "ahi", title: "Events per hour", unit: "AHI", kind: "stack", yMin: 6, ref: { v: 5, label: "AHI 5" },
+    series: [{ label: "Obstructive apnea", color: C.oa, get: (s) => s.oai }, { label: "Hypopnea", color: C.h, get: (s) => s.hi }, { label: "Central apnea", color: C.ca, get: (s) => s.cai }],
+    tip: (b) => [{ label: "AHI", value: f1(b.s.ahi) }, { label: "Obstructive", color: C.oa, value: `${f1(b.s.oai)} (${b.s.oa})` }, { label: "Hypopnea", color: C.h, value: `${f1(b.s.hi)} (${b.s.h})` }, { label: "Central", color: C.ca, value: `${f1(b.s.cai)} (${b.s.ca})` }] },
+  { id: "pressure", title: "Pressure", unit: "cmH2O", kind: "lines", yMin: 12,
+    series: [{ label: "95th percentile", color: C.p95, get: (s) => s.p95 }, { label: "Median", color: C.p50, get: (s) => s.p50 }],
+    tip: (b) => [{ label: "95th %", color: C.p95, value: f1(b.s.p95) }, { label: "Median", color: C.p50, value: f1(b.s.p50) }, { label: "Max", value: f1(b.s.pmax) }] },
+  { id: "leak", title: "Unintentional leak", unit: "L/min", kind: "lines", yMin: 20, ref: { v: 24, label: "24 L/min" },
+    series: [{ label: "95th percentile", color: C.p95, get: (s) => s.l95 }, { label: "Median", color: C.p50, get: (s) => s.l50 }],
+    tip: (b) => [{ label: "95th %", color: C.p95, value: f0(b.s.l95) }, { label: "Median", color: C.p50, value: f0(b.s.l50) }, { label: "Time over 24", value: b.s.lbig == null ? "-" : (b.s.lbig * 100).toFixed(1) + "%" }] },
+];
+function legend(series, kind) {
+  return h("div", { class: "legend" }, ...series.map((s) => h("span", {}, h("i", { class: kind === "lines" ? "ln" : "sw", style: `background:${s.color}` }), s.label)));
+}
+
+// ---------- night detail ----------
+const EV_ROWS = [["oa", "Obstructive", C.oa], ["h", "Hypopnea", C.h], ["ca", "Central", C.ca], ["csr", "CSR", C.csr], ["sn", "Snore", C.sn]];
+function drawNight(n, W = 720) {
+  const H = 360, m = { l: 74, r: 12 };
+  const pw = W - m.l - m.r;
+  const svg = sv("svg", { viewBox: `0 0 ${W} ${H}`, width: W, height: H, "font-family": FONT, role: "img" });
+  // a few-second "session" is just the machine being switched on; don't let it stretch the time axis
+  const real = n.ses.filter((s) => s[2] >= 60);
+  const ses = real.length ? real : n.ses;
+  const t0 = localMs(n.ses[0][0]);
+  const end = Math.max(...ses.map((s) => localMs(s[1])));
+  const span = Math.max(30, (end - t0) / 60000);
+  const x = (min) => m.l + (min / span) * pw;
+  const xt = (t) => x((localMs(t) - t0) / 60000);
+  const label = (yy, text) => sv("text", { x: m.l - 8, y: yy, "text-anchor": "end", "font-size": 11, fill: C.ink2 }, svg, text);
+
+  // sessions
+  label(18, "Sessions");
+  for (const s of n.ses) {
+    const a = xt(s[0]), b = Math.max(a + 2, xt(s[1]));
+    sv("rect", { x: a, y: 9, width: b - a, height: 12, rx: 3, fill: C.s1 }, svg);
+  }
+  // panels
+  const panel = (y0, hgt, vals, maxMin, ref, title, unit) => {
+    const vmax = scaleY(Math.max(maxMin, ref ? ref * 1.1 : 0, ...vals.filter((v) => v != null)), maxMin);
+    const y = (v) => y0 + hgt - (v / vmax.max) * hgt;
+    for (let v = 0; v <= vmax.max + 1e-9; v += vmax.step) {
+      sv("line", { x1: m.l, x2: W - m.r, y1: y(v), y2: y(v), stroke: v === 0 ? C.axis : C.grid }, svg);
+      sv("text", { x: m.l - 6, y: y(v) + 4, "text-anchor": "end", "font-size": 10, fill: C.muted }, svg, String(+v.toFixed(1)));
+    }
+    sv("text", { x: m.l, y: y0 - 6, "font-size": 11, fill: C.ink2 }, svg, `${title} (${unit})`);
+    if (ref) {
+      sv("line", { x1: m.l, x2: W - m.r, y1: y(ref), y2: y(ref), stroke: C.ink2 }, svg);
+      sv("text", { x: W - m.r, y: y(ref) - 4, "text-anchor": "end", "font-size": 10, fill: C.ink2 }, svg, String(ref));
+    }
+    let d = "", pen = false;
+    vals.forEach((v, i) => { if (v == null) { pen = false; return; } d += (pen ? "L" : "M") + x(i + 0.5).toFixed(1) + "," + y(v).toFixed(1); pen = true; });
+    sv("path", { d, fill: "none", stroke: C.s1, "stroke-width": 1.5, "stroke-linejoin": "round" }, svg);
+  };
+  panel(46, 92, n.tl.p.map((v) => (v == null ? null : v / 10)), 12, null, "Pressure", "cmH2O");
+  panel(172, 70, n.tl.l, 20, 24, "Leak", "L/min");
+  // events
+  EV_ROWS.forEach(([k, name, color], i) => {
+    const yy = 262 + i * 16;
+    label(yy + 9, name);
+    sv("line", { x1: m.l, x2: W - m.r, y1: yy + 12, y2: yy + 12, stroke: C.grid }, svg);
+    for (const [t, dur] of n.ev[k] || []) {
+      const a = xt(t), w = Math.max(2, (dur / 60 / span) * pw);
+      sv("rect", { x: k === "csr" ? a - w : a - 1, y: yy, width: w, height: 11, fill: color }, svg);
+    }
+  });
+  // clock axis
+  const first = new Date(t0); first.setMinutes(0, 0, 0); first.setHours(first.getHours() + 1);
+  const stepH = span > 12 * 60 ? 2 : 1;
+  for (let t = first.getTime(); t <= end; t += stepH * 3600000) {
+    const xx = x((t - t0) / 60000);
+    sv("line", { x1: xx, x2: xx, y1: 344 - 8, y2: 344 - 4, stroke: C.axis }, svg);
+    sv("text", { x: xx, y: 356, "text-anchor": "middle", "font-size": 11, fill: C.muted }, svg, String(new Date(t).getHours()).padStart(2, "0") + ":00");
+  }
+  sv("line", { x1: m.l, x2: W - m.r, y1: 340, y2: 340, stroke: C.axis }, svg);
+  return svg;
+}
+
+function nightOption(n) {
+  const s = NIGHT_STATS.get(n.d);
+  return `${fmtWd(n.d)} ${fmtDate(n.d)}  -  ${fmtH(n.hours)}  -  AHI ${f1(s.ahi)}`;
+}
+function selectNight(d, scroll) {
+  SEL = d;
+  $("#nightSel").value = d;
+  const n = BY.get(d);
+  $("#nightChart").replaceChildren(drawNight(n, Math.max(360, $("#nightChart").clientWidth)));
+  document.querySelectorAll("#nightTable tbody tr").forEach((tr) => tr.classList.toggle("sel", tr.dataset.d === d));
+  if (scroll) $("#nightChart").scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+// ---------- rendering ----------
+function statusFor(ahi) {
+  if (ahi == null) return null;
+  if (ahi < 5) return [C.good, "Under 5: in the normal range"];
+  if (ahi < 15) return [C.warn, "5 to 15: mild range"];
+  if (ahi < 30) return [C.serious, "15 to 30: moderate range"];
+  return [C.crit, "30 or more: severe range"];
+}
+function statusIcon(color) {
+  const s = sv("svg", { width: 12, height: 12, viewBox: "0 0 12 12", "aria-hidden": "true" });
+  sv("circle", { cx: 6, cy: 6, r: 5, fill: color }, s);
+  return s;
+}
+
+function summaryRows(S, st) {
+  const machineDays = S.used4one !== S.used4 ? [["4h+ in one session (machine count)", `${S.used4one}`]] : [];
+  const changes = settingsChanges(R.from, R.to);
+  return {
+    Compliance: [
+      ["Days in period", S.nDays], ["Days used", `${S.used} (${pctTxt(S.used, S.nDays)})`],
+      ["Days used 4h or more", `${S.used4} (${pctTxt(S.used4, S.nDays)})`], ...machineDays,
+      ["Days not used", S.nDays - S.used], ["Total usage", fmtH(S.hrs)],
+      ["Average, all days", fmtH(S.avgAll)], ["Average, days used", fmtH(S.avgUsed)], ["Median, days used", fmtH(S.medUsed)],
+    ],
+    "Events per hour": [
+      ["AHI (apneas + hypopneas)", f1(S.ahi)], ["Obstructive apnea index", `${f1(S.oai)}  (${S.oa})`],
+      ["Hypopnea index", `${f1(S.hi)}  (${S.h})`], ["Central apnea index", `${f1(S.cai)}  (${S.ca})`],
+      ["AHI as the machine shows it (OA + H)", f1(S.ahiMachine)],
+      ["Cheyne-Stokes respiration", S.hrs ? `${((S.csrS / 3600 / S.hrs) * 100).toFixed(1)}% of time` : "-"],
+      ["Snore events", `${S.sn}`], ...(S.pb ? [["Periodic breathing events", S.pb]] : []), ...(S.fl ? [["Flow limitation events", S.fl]] : []),
+    ],
+    "Settings": [
+      ["Mode", st ? st.mode : "-"], ["Pressure", modeText(st).replace(/^\S+ /, "")],
+      ["Start pressure", st ? `${f1(st.start)} cmH2O` : "-"], ["Ramp", st ? (st.ramp ? `${st.ramp} min` : "Off") : "-"],
+      ["Exhale relief (DEP)", st ? (st.relief ? `Level ${st.relief}` : "Off") : "-"], ["Humidifier", st ? (st.humidity ? `Level ${st.humidity}` : "Off") : "-"],
+      ["Heated tube", st ? (st.tube ? `${st.tube} C` : "Off") : "-"], ["Mask", st ? st.mask : "-"],
+      ["SmartStart / SmartStop", st ? `${st.smart_start ? "On" : "Off"} / ${st.smart_stop ? "On" : "Off"}` : "-"],
+      ...(changes.length ? [["Settings changed", changes.map(([t]) => fmtShort(t.slice(0, 10))).join(", ")]] : []),
+    ],
+    "Pressure (cmH2O)": [
+      ["Median", f1(S.p50)], ["90th percentile", f1(S.p90)], ["95th percentile", f1(S.p95)], ["Maximum", f1(S.pmax)],
+    ],
+    "Unintentional leak (L/min)": [
+      ["Median", f0(S.l50)], ["90th percentile", f0(S.l90)], ["95th percentile", f0(S.l95)], ["Maximum", f0(S.lmax)],
+      ["Average", f1(S.lmean)], ["Time above 24 L/min", S.lbig == null ? "-" : `${(S.lbig * 100).toFixed(1)}%`],
+    ],
+    "Breathing (typical)": [
+      ["Respiratory rate", S.rr == null ? "-" : `${f1(S.rr)} /min`], ["Tidal volume", S.tv == null ? "-" : `${f0(S.tv)} mL`],
+      ["Minute ventilation", S.mv == null ? "-" : `${f1(S.mv)} L/min`], ["Inspiratory time", S.ti == null ? "-" : `${f2(S.ti / 1000)} s`],
+      ["I:E ratio", S.ie == null ? "-" : `1 : ${f1(S.ie)}`],
+      ...(S.o2 != null ? [["SpO2 median / lowest", `${f0(S.o2)}% / ${f0(S.o2min)}%`], ["Pulse median", `${f0(S.hr)} bpm`]] : []),
+    ],
+  };
+}
+
+// "Hide serial number" masks it on screen and in the PDF, for sharing screenshots
+const serial = () => (store.get("hideSerial", false) ? "XXXX-XXX" : (DATA.device || {}).serial || "-");
+
+function renderDevice() {
+  const dv = DATA.device || {}, mt = DATA.meters;
+  $("#headSub").textContent = `Hypnus ${dv.model || ""}  ·  SN ${serial()}  ·  generated ${DATA.generated.replace("T", " ")}`;
+  const kv = [
+    ["Device", "Hypnus Series 8 (S8)"], ["Model", dv.model || "-"], ["Serial number", serial()], ["Firmware", dv.firmware || "-"],
+    ["Mask", dv.mask || "-"], ["Blower hours", mt ? `${mt.motor_h.toLocaleString("en", { minimumFractionDigits: 1 })} h` : "-"],
+    ["Powered-on hours", mt ? `${mt.device_h.toLocaleString("en", { minimumFractionDigits: 1 })} h` : "-"],
+    ["Data on card", `${fmtDate(FIRST)} - ${fmtDate(LAST)} (${USED.length} nights)`],
+  ];
+  $("#deviceKv").replaceChildren(...kv.map(([k, v]) => h("div", {}, h("dt", {}, k), h("dd", {}, v))));
+}
+
+function renderStatic() {
+  if (DATA.logo) $("#logo").src = DATA.logo; else $("#logo").remove();
+  if (DATA.photo) $("#photo").src = DATA.photo; else $("#photo").remove();
+  renderDevice();
+  const hide = $("#hideSerial");
+  hide.checked = store.get("hideSerial", false);
+  hide.addEventListener("change", () => { store.set("hideSerial", hide.checked); renderDevice(); });
+  const pres = $("#presets");
+  for (const [lab, p] of PRESETS) pres.append(h("button", { type: "button", "data-p": p, onclick: () => { applyPreset(p); render(); } }, lab));
+  for (const id of ["from", "to"]) {
+    const inp = $("#" + id);
+    inp.min = FIRST; inp.max = LAST;
+    inp.addEventListener("change", () => {
+      if (!inp.value) return;
+      R[id] = inp.value < FIRST ? FIRST : inp.value > LAST ? LAST : inp.value;
+      if (R.from > R.to) { if (id === "from") R.to = R.from; else R.from = R.to; }
+      R.preset = null; render();
+    });
+  }
+  for (const id of ["pname", "pdob"]) { const inp = $("#" + id); inp.value = store.get(id, ""); inp.addEventListener("input", () => store.set(id, inp.value)); }
+  $("#nightSel").addEventListener("change", (e) => selectNight(e.target.value));
+  $("#nightLegend").replaceChildren(...EV_ROWS.map(([, name, color]) => h("span", {}, h("i", { class: "sw", style: `background:${color}` }), name)),
+    h("span", {}, h("i", { class: "ln", style: `background:${C.s1}` }), "Pressure / leak"));
+  $("#pdfBtn").addEventListener("click", makePdf);
+  if (NATIVE) $("#pdfBtn").textContent = "Export PDF…";
+  window.cpapExportPdf = makePdf;   // the app's File > Export PDF menu calls this
+
+  const lcd = DATA.lcd;
+  $("#notes").replaceChildren(
+    h("p", {}, "How to read this report. A therapy night runs noon to noon, so a session that starts after midnight counts toward the evening before. ",
+      "AHI here counts obstructive apneas, hypopneas and central apneas per hour of use. The machine's own screen and Hypnus' PC software leave central apneas out (the 'OA + H' row). ",
+      "Leak is unintentional leak, after the mask's designed vent flow. Pressure is the pressure the machine set, sampled every second. Breathing values are hours-weighted medians the machine estimates from flow."),
+    h("p", {}, "The machine's own screen counts a 4-hour day only when a single session lasts 4 hours, so its count can be lower when a night is interrupted. ",
+      lcd ? `Its Info screen last showed (${PERIODS[lcd.period] || "period " + lcd.period}): ${lcd.days_used} days used, ${lcd.days_4h} days 4h+, AHI ${f1(lcd.ahi)}, 90% pressure ${f1(lcd.p90)} cmH2O, leak ${f1(lcd.leak)} L/min.` : ""),
+    h("p", {}, `Generated by iHypnusCare, an unofficial tool, from the SD card at ${DATA.source}. It is not made or endorsed by Hypnus. Values come from decoding the machine's data files and should be confirmed with your clinician.`),
+  );
+}
+
+function render() {
+  store.set("range", R);
+  document.querySelectorAll("#presets button").forEach((b) => b.setAttribute("aria-pressed", String(+b.dataset.p === R.preset)));
+  $("#from").value = R.from; $("#to").value = R.to;
+  const days = rangeDays();
+  const list = rangeNights();
+  const S = summarize(list, days.length);
+  const st = settingsAt(R.to);
+
+  // tiles
+  const status = statusFor(S.ahi);
+  $("#tiles").replaceChildren(
+    h("div", { class: "card tile hero" }, h("div", { class: "label" }, "AHI, events per hour"), h("div", { class: "value" }, f1(S.ahi)),
+      h("div", { class: "sub" }, `Obstructive ${f1(S.oai)}  ·  Hypopnea ${f1(S.hi)}  ·  Central ${f1(S.cai)}`),
+      status ? h("div", { class: "status" }, statusIcon(status[0]), status[1]) : null),
+    h("div", { class: "card tile" }, h("div", { class: "label" }, "Nights used"), h("div", { class: "value" }, `${S.used}`, h("small", {}, ` / ${S.nDays}`)),
+      h("div", { class: "sub" }, `${S.used4} nights 4h+ (${pctTxt(S.used4, S.nDays)})`)),
+    h("div", { class: "card tile" }, h("div", { class: "label" }, "Average use"), h("div", { class: "value" }, fmtH(S.avgUsed)),
+      h("div", { class: "sub" }, `per night used  ·  ${fmtH(S.avgAll)} over all nights`)),
+    h("div", { class: "card tile" }, h("div", { class: "label" }, "Pressure, 95th %"), h("div", { class: "value" }, f1(S.p95), h("small", {}, " cmH2O")),
+      h("div", { class: "sub" }, `median ${f1(S.p50)}  ·  ${st ? modeText(st) : ""}`)),
+    h("div", { class: "card tile" }, h("div", { class: "label" }, "Leak, 95th %"), h("div", { class: "value" }, f0(S.l95), h("small", {}, " L/min")),
+      h("div", { class: "sub" }, `median ${f0(S.l50)}  ·  ${S.lbig == null ? "-" : (S.lbig * 100).toFixed(1) + "%"} above 24`)),
+  );
+
+  // stat cards
+  const rows = summaryRows(S, st);
+  $("#stats").replaceChildren(...Object.entries(rows).map(([title, rs]) =>
+    h("div", { class: "card" }, h("h2", {}, title), h("table", { class: "s" }, h("tbody", {}, ...rs.map(([k, v]) => h("tr", {}, h("td", {}, k), h("td", {}, String(v)))))))));
+
+  // charts
+  const B = buckets();
+  const per = B.mode === "day" ? "per night" : B.mode === "week" ? "weekly" : "monthly";
+  const plots = CHARTS.map(() => h("div"));
+  $("#charts").replaceChildren(...CHARTS.map((c, i) => h("div", { class: "card chart" },
+    h("h2", {}, `${c.title} `, h("span", { class: "note" }, `${c.unit}, ${per}`)),
+    c.series.length > 1 ? legend(c.series, c.kind) : null, plots[i])));
+  // draw at the real on-screen width so text stays at its intended size
+  CHARTS.forEach((c, i) => plots[i].append(drawChart({ ...c, B, W: Math.max(300, plots[i].clientWidth), H: 230 })));
+
+  // nights
+  const usedList = list.filter((n) => n.hours > 0);
+  const sel = $("#nightSel");
+  sel.replaceChildren(...usedList.slice().reverse().map((n) => h("option", { value: n.d }, nightOption(n))));
+  if (!usedList.length) { $("#nightChart").replaceChildren(h("p", { class: "note" }, "No therapy in this period.")); }
+
+  // table
+  const head = ["Night", "Start", "End", "Used", "Sessions", "AHI", "OA", "H", "CA", "Press. 95%", "Leak 95%", "Leak >24", "Resp. rate", "Tidal vol."];
+  const body = days.slice().reverse().map((d) => {
+    const n = BY.get(d), s = n && NIGHT_STATS.get(d);
+    if (!n || !(n.hours > 0)) return h("tr", { class: "off" }, h("td", {}, `${fmtWd(d)} ${fmtDate(d)}`), h("td", {}, "-"), h("td", {}, "-"), h("td", {}, "Not used"), ...Array(10).fill(0).map(() => h("td", {}, "-")));
+    const real = n.ses.filter((x) => x[2] >= 60);
+    const ses = real.length ? real : n.ses;
+    return h("tr", { class: "on", "data-d": d, onclick: () => selectNight(d, true) },
+      h("td", {}, `${fmtWd(d)} ${fmtDate(d)}`), h("td", {}, clock(ses[0][0])), h("td", {}, clock(ses[ses.length - 1][1])),
+      h("td", {}, fmtH(n.hours)), h("td", {}, real.length), h("td", {}, f1(s.ahi)), h("td", {}, s.oa), h("td", {}, s.h), h("td", {}, s.ca),
+      h("td", {}, f1(s.p95)), h("td", {}, f0(s.l95)), h("td", {}, s.lbig == null ? "-" : (s.lbig * 100).toFixed(1) + "%"),
+      h("td", {}, n.rr ?? "-"), h("td", {}, n.tv == null ? "-" : n.tv + " mL"));
+  });
+  $("#nightTable").replaceChildren(h("thead", {}, h("tr", {}, ...head.map((x) => h("th", {}, x)))), h("tbody", {}, ...body));
+
+  if (usedList.length) selectNight(usedList.some((n) => n.d === SEL) ? SEL : usedList[usedList.length - 1].d);
+}
+
+// ---------- PDF ----------
+function loadScript(src) {
+  return new Promise((res, rej) => { const s = document.createElement("script"); s.src = src; s.onload = res; s.onerror = () => rej(new Error(src)); document.head.appendChild(s); });
+}
+let libsReady = null;
+function loadLibs() {
+  if (!libsReady) libsReady = (async () => { for (const u of LIBS) await loadScript(u); })().catch((e) => { libsReady = null; throw e; });
+  return libsReady;
+}
+const ascii = (s) => String(s).replace(/[·•]/g, "-").replace(/[–—]/g, "-").replace(/≥/g, ">=").replace(/[^\x20-\x7e]/g, "");
+const rgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+
+async function svgInto(doc, svg, x, y, w) {
+  const holder = h("div", { style: "position:absolute;left:-10000px;top:0;width:720px" });
+  holder.append(svg); document.body.append(holder);
+  const W = +svg.getAttribute("width"), H = +svg.getAttribute("height");
+  try { await doc.svg(svg, { x, y, width: w, height: (w * H) / W }); } finally { holder.remove(); }
+  return (w * H) / W;
+}
+
+async function makePdf() {
+  const btn = $("#pdfBtn"), status = $("#pdfStatus");
+  btn.disabled = true; status.textContent = "Building PDF...";
+  try {
+    await loadLibs();
+  } catch (e) {
+    status.textContent = "Couldn't load the PDF library. It needs an internet connection. You can use File > Print > Save as PDF instead.";
+    btn.disabled = false; return;
+  }
+  try {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: "mm", format: "a4" });
+    const PW = 210, PH = 297, M = 14, CW = PW - 2 * M;
+    const days = rangeDays(), list = rangeNights(), S = summarize(list, days.length), st = settingsAt(R.to), dv = DATA.device || {}, mt = DATA.meters;
+    const txt = (s, x, y, o = {}) => { doc.setFont("helvetica", o.bold ? "bold" : "normal"); doc.setFontSize(o.size || 10); doc.setTextColor(...rgb(o.color || C.ink)); doc.text(ascii(s), x, y, o.align ? { align: o.align } : undefined); };
+    const pageHead = (title) => {
+      if (DATA.logo) doc.addImage(DATA.logo, "PNG", M, 9, 25, 10);
+      txt(title, PW - M, 14, { bold: true, size: 12, align: "right" });
+      txt(`${fmtDate(R.from)} - ${fmtDate(R.to)}`, PW - M, 19, { size: 9, color: C.ink2, align: "right" });
+      doc.setDrawColor(...rgb(C.brand)); doc.setLineWidth(0.6); doc.line(M, 23, PW - M, 23);
+    };
+
+    // page 1: header, patient, device, summary
+    if (DATA.logo) doc.addImage(DATA.logo, "PNG", M, 10, 37, 15);
+    txt("CPAP Therapy Report", PW - M, 17, { bold: true, size: 17, align: "right" });
+    txt(`${fmtDate(R.from)} - ${fmtDate(R.to)}  (${days.length} days)`, PW - M, 23, { size: 10, color: C.ink2, align: "right" });
+    doc.setDrawColor(...rgb(C.brand)); doc.setLineWidth(0.8); doc.line(M, 29, PW - M, 29);
+
+    const name = $("#pname").value.trim(), dob = $("#pdob").value.trim();
+    let y = 37;
+    const info = [
+      ["Patient", name || "-"], ["Date of birth", dob || "-"],
+      ["Device", `Hypnus Series 8, model ${dv.model || "-"}`], ["Serial number", serial()], ["Firmware", dv.firmware || "-"],
+      ["Mode", modeText(st)], ["Blower hours", mt ? `${mt.motor_h.toFixed(1)} h` : "-"], ["Report generated", DATA.generated.replace("T", " ")],
+    ];
+    info.forEach(([k, v], i) => { const yy = y + i * 5.6; txt(k, M, yy, { size: 9, color: C.muted }); txt(v, M + 32, yy, { size: 9.5, bold: k === "Patient" }); });
+    if (DATA.photo) doc.addImage(DATA.photo, "JPEG", PW - M - 52, 32, 52, 52);
+    y = 32 + 52 + 2;
+
+    // headline numbers
+    const heads = [["AHI", f1(S.ahi), "events per hour"], ["Days used", `${S.used} / ${S.nDays}`, pctTxt(S.used, S.nDays) + " of days"],
+      ["Days 4h+", `${S.used4}`, pctTxt(S.used4, S.nDays) + " of days"], ["Average use", fmtH(S.avgUsed), "per day used"]];
+    const bw = (CW - 9) / 4;
+    heads.forEach(([k, v, sub], i) => {
+      const x = M + i * (bw + 3);
+      doc.setDrawColor(...rgb(C.grid)); doc.setFillColor(...rgb(C.surface)); doc.setLineWidth(0.25); doc.roundedRect(x, y, bw, 20, 2, 2, "FD");
+      txt(k, x + 3.5, y + 5.5, { size: 8.5, color: C.ink2 }); txt(v, x + 3.5, y + 13, { size: 15, bold: true }); txt(sub, x + 3.5, y + 17.6, { size: 7.5, color: C.ink2 });
+    });
+    y += 26;
+
+    const rows = summaryRows(S, st);
+    const colW = (CW - 6) / 2;
+    const cols = [["Compliance", "Events per hour", "Breathing (typical)"], ["Settings", "Pressure (cmH2O)", "Unintentional leak (L/min)"]];
+    let bottom = y;
+    cols.forEach((titles, ci) => {
+      let yy = y;
+      for (const t of titles) {
+        doc.autoTable({
+          startY: yy, margin: { left: M + ci * (colW + 6) }, tableWidth: colW, theme: "plain",
+          head: [[ascii(t), ""]], body: rows[t].map(([k, v]) => [ascii(k), ascii(v)]),
+          styles: { fontSize: 8.3, cellPadding: { top: 0.9, bottom: 0.9, left: 1.5, right: 1.5 }, textColor: rgb(C.ink), lineColor: rgb(C.grid), lineWidth: { bottom: 0.15 } },
+          headStyles: { fontStyle: "bold", fillColor: rgb("#f0efec"), textColor: rgb(C.ink), lineWidth: 0 },
+          columnStyles: { 1: { halign: "right", fontStyle: "bold" } },
+        });
+        yy = doc.lastAutoTable.finalY + 4;
+      }
+      bottom = Math.max(bottom, yy);
+    });
+
+    // page 2: charts
+    doc.addPage(); pageHead("Trends");
+    const B = buckets();
+    const per = B.mode === "day" ? "per night" : B.mode === "week" ? "weekly" : "monthly";
+    y = 30;
+    for (const c of CHARTS) {
+      txt(`${c.title}`, M, y, { bold: true, size: 10.5 });
+      txt(`${c.unit}, ${per}`, M + doc.getTextWidth(ascii(c.title)) * (10 / 10.5) + 6, y, { size: 8.5, color: C.ink2 });
+      let lx = PW - M;
+      for (const s of c.series.slice().reverse()) {
+        if (c.series.length < 2) break;
+        doc.setFontSize(8); const w = doc.getTextWidth(ascii(s.label));
+        lx -= w; txt(s.label, lx, y, { size: 8, color: C.ink2 });
+        doc.setFillColor(...rgb(s.color));
+        if (c.kind === "lines") doc.rect(lx - 6, y - 1.6, 4.5, 0.8, "F"); else doc.roundedRect(lx - 5, y - 2.6, 3, 3, 0.6, 0.6, "F");
+        lx -= 9;
+      }
+      y += 2;
+      y += await svgInto(doc, drawChart({ ...c, B, pdf: true, W: 720, H: 200 }), M, y, CW) + 7;
+    }
+
+    // optional night detail
+    if ($("#pdfNight").checked && SEL && BY.get(SEL)) {
+      const n = BY.get(SEL), s = NIGHT_STATS.get(SEL);
+      doc.addPage(); pageHead("Night detail");
+      txt(`${fmtWd(SEL)} ${fmtDate(SEL)}`, M, 31, { bold: true, size: 12 });
+      txt(`Used ${fmtH(n.hours)}  -  AHI ${f1(s.ahi)} (OA ${s.oa}, H ${s.h}, CA ${s.ca})  -  pressure 95% ${f1(s.p95)} cmH2O  -  leak 95% ${f0(s.l95)} L/min`, M, 37, { size: 9, color: C.ink2 });
+      let lx = M;
+      for (const [, name, color] of EV_ROWS) { doc.setFillColor(...rgb(color)); doc.roundedRect(lx, 41.4, 3, 3, 0.6, 0.6, "F"); txt(name, lx + 4.5, 44, { size: 8, color: C.ink2 }); doc.setFontSize(8); lx += doc.getTextWidth(name) + 10; }
+      await svgInto(doc, drawNight(n, 720), M, 48, CW);
+    }
+
+    // nightly table
+    doc.addPage(); pageHead("Nightly data");
+    const tableStart = doc.internal.getNumberOfPages();
+    const head =["Night", "Start", "End", "Used", "AHI", "OA", "H", "CA", "Press 95%", "Leak 95%", "Leak>24", "RR", "TV mL"];
+    const body = days.slice().reverse().map((d) => {
+      const n = BY.get(d), s = n && NIGHT_STATS.get(d);
+      if (!n || !(n.hours > 0)) return [`${fmtWd(d)} ${fmtDate(d)}`, "", "", "Not used", "", "", "", "", "", "", "", "", ""];
+      const real = n.ses.filter((x) => x[2] >= 60), ses = real.length ? real : n.ses;
+      return [`${fmtWd(d)} ${fmtDate(d)}`, clock(ses[0][0]), clock(ses[ses.length - 1][1]), fmtH(n.hours), f1(s.ahi), s.oa, s.h, s.ca,
+        f1(s.p95), f0(s.l95), s.lbig == null ? "-" : (s.lbig * 100).toFixed(1) + "%", n.rr ?? "-", n.tv ?? "-"];
+    });
+    doc.autoTable({
+      startY: 28, margin: { left: M, right: M, top: 28 }, head: [head], body, theme: "plain",
+      styles: { fontSize: 7.8, cellPadding: { top: 0.9, bottom: 0.9, left: 1.2, right: 1.2 }, halign: "right", textColor: rgb(C.ink), lineColor: rgb(C.grid), lineWidth: { bottom: 0.15 } },
+      headStyles: { fontStyle: "bold", textColor: rgb(C.ink2), lineColor: rgb(C.axis), lineWidth: { bottom: 0.3 } },
+      columnStyles: { 0: { halign: "left" } },
+      didParseCell: (d) => {
+        if (d.column.index === 0) d.cell.styles.halign = "left";
+        if (d.section === "body" && d.row.raw[3] === "Not used") d.cell.styles.textColor = rgb(C.muted);
+      },
+      didDrawPage: () => { if (doc.internal.getCurrentPageInfo().pageNumber > tableStart) pageHead("Nightly data"); },
+    });
+
+    // footers
+    const pages = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pages; i++) {
+      doc.setPage(i);
+      doc.setDrawColor(...rgb(C.grid)); doc.setLineWidth(0.2); doc.line(M, PH - 14, PW - M, PH - 14);
+      txt(`${name ? name + "  -  " : ""}Hypnus ${dv.model || ""} SN ${serial()}`, M, PH - 9.5, { size: 7.5, color: C.ink2 });
+      txt(`Page ${i} of ${pages}`, PW - M, PH - 9.5, { size: 7.5, color: C.ink2, align: "right" });
+      txt("Generated by iHypnusCare (unofficial, not made by Hypnus) from SD card data. AHI includes central apneas; nights run noon to noon.", M, PH - 5.5, { size: 6.8, color: C.muted });
+    }
+    const fileName = `CPAP report ${R.from} to ${R.to}.pdf`;
+    if (NATIVE) {
+      // inside iHypnusCare.app: hand the PDF to the app, which shows a Save dialog
+      NATIVE.postMessage({ type: "pdf", name: fileName, data: doc.output("datauristring").split(",")[1] });
+      status.textContent = "";
+    } else {
+      doc.save(fileName);
+      status.textContent = "PDF downloaded.";
+    }
+  } catch (e) {
+    console.error(e);
+    status.textContent = "PDF failed: " + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+renderStatic();
+render();
+let resizeTimer = 0;
+let lastWidth = innerWidth;
+addEventListener("resize", () => {
+  if (innerWidth === lastWidth) return;
+  lastWidth = innerWidth;
+  clearTimeout(resizeTimer); resizeTimer = setTimeout(render, 200);
+});
+</script>
+</body>
+</html>

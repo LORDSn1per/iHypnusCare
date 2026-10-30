@@ -1,0 +1,15 @@
+# build output
+*.app/
+
+# personal data: generated reports, card copies, private notes
+Reports/
+Original/
+Modified/
+DATAFILE/
+AGENTS.local.md
+*.pdf
+
+# local tooling
+.claude/
+.DS_Store
+._*
